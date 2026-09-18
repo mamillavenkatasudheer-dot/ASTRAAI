@@ -2,45 +2,33 @@ import { useState } from 'react'
 import './App.css'
 
 function App() {
-  // Stores the text currently typed by the user
   const [message, setMessage] = useState('')
-
-  // Stores all messages in the conversation
   const [messages, setMessages] = useState([])
-
-  // Stores whether we are waiting for the backend
   const [loading, setLoading] = useState(false)
 
   const handleSend = async () => {
-    // Don't send an empty message
-    if (message.trim() === '') {
+    if (message.trim() === '' || loading) {
       return
     }
 
-    // Save the user's message before clearing the input
-    const userText = message
+    const userText = message.trim()
 
-    // Display the user's message
-    const userMessage = {
-      text: userText,
-      sender: 'user',
-    }
-
+    // Add user's message to the chat
     setMessages((previousMessages) => [
       ...previousMessages,
-      userMessage,
+      {
+        text: userText,
+        sender: 'user',
+      },
     ])
 
-    // Clear the input box
     setMessage('')
-
-    // Show loading state
     setLoading(true)
 
     try {
-      // Send the user's question to our backend
+      // Connect to the online AstraAI backend
       const response = await fetch(
-        'http://localhost:5000/api/chat',
+        'https://astraai-tzac.onrender.com/api/chat',
         {
           method: 'POST',
           headers: {
@@ -52,37 +40,37 @@ function App() {
         }
       )
 
-      // Convert the backend response into JavaScript data
+      // Check if the server returned an error
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+
       const data = await response.json()
 
-      // Create the AI message
-      const aiMessage = {
-        text: data.reply,
-        sender: 'ai',
-      }
-
-      // Display the AI response
+      // Add AstraAI's response
       setMessages((previousMessages) => [
         ...previousMessages,
-        aiMessage,
+        {
+          text:
+            data.reply ||
+            'Sorry, I could not generate a response.',
+          sender: 'ai',
+        },
       ])
     } catch (error) {
-      console.error('Error:', error)
-
-      // Display an error message
-      const errorMessage = {
-        text: 'Sorry, I could not connect to the backend.',
-        sender: 'ai',
-      }
+      console.error('Connection Error:', error)
 
       setMessages((previousMessages) => [
         ...previousMessages,
-        errorMessage,
+        {
+          text:
+            'Sorry, I could not connect to AstraAI. Please try again.',
+          sender: 'ai',
+        },
       ])
+    } finally {
+      setLoading(false)
     }
-
-    // Stop loading
-    setLoading(false)
   }
 
   return (
@@ -94,19 +82,24 @@ function App() {
         <p>Your AI Assistant</p>
       </header>
 
-      {/* Chat area */}
+      {/* Chat Area */}
       <main className="chat-container">
 
         {/* Welcome message */}
-        <div className="welcome">
-          <h2>Hello! 👋</h2>
-          <p>
-            I'm AstraAI. Ask me anything and I'll try to help you.
-          </p>
-        </div>
+        {messages.length === 0 && (
+          <div className="welcome">
+            <h2>Hello! 👋</h2>
+
+            <p>
+              I'm AstraAI. Ask me anything and I'll try to
+              help you.
+            </p>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="messages">
+
           {messages.map((msg, index) => (
             <div
               className={
@@ -126,11 +119,11 @@ function App() {
               AstraAI is thinking... 🤔
             </div>
           )}
-        </div>
 
+        </div>
       </main>
 
-      {/* Input area */}
+      {/* Input Area */}
       <div className="input-container">
 
         <input
@@ -145,6 +138,7 @@ function App() {
               handleSend()
             }
           }}
+          disabled={loading}
         />
 
         <button
