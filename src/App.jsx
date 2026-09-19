@@ -7,13 +7,14 @@ function App() {
   const [loading, setLoading] = useState(false)
 
   const handleSend = async () => {
+    // Don't send empty messages
     if (message.trim() === '' || loading) {
       return
     }
 
     const userText = message.trim()
 
-    // Add user's message to the chat
+    // Add user's message
     setMessages((previousMessages) => [
       ...previousMessages,
       {
@@ -22,32 +23,50 @@ function App() {
       },
     ])
 
+    // Clear input box
     setMessage('')
+
+    // Start loading
     setLoading(true)
 
     try {
-      // Connect to the online AstraAI backend
+      // Connect to the PUBLIC AstraAI backend on Render
       const response = await fetch(
         'https://astraai-tzac.onrender.com/api/chat',
         {
           method: 'POST',
+
           headers: {
             'Content-Type': 'application/json',
           },
+
           body: JSON.stringify({
             message: userText,
           }),
         }
       )
 
-      // Check if the server returned an error
+      // Check if server returned an error
       if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`)
+        let errorMessage = `Server error: ${response.status}`
+
+        try {
+          const errorData = await response.json()
+
+          if (errorData.reply) {
+            errorMessage = errorData.reply
+          }
+        } catch {
+          // Keep the default error message
+        }
+
+        throw new Error(errorMessage)
       }
 
+      // Convert server response to JSON
       const data = await response.json()
 
-      // Add AstraAI's response
+      // Add AstraAI response
       setMessages((previousMessages) => [
         ...previousMessages,
         {
@@ -60,15 +79,18 @@ function App() {
     } catch (error) {
       console.error('Connection Error:', error)
 
+      // Show error in the chat
       setMessages((previousMessages) => [
         ...previousMessages,
         {
           text:
+            error.message ||
             'Sorry, I could not connect to AstraAI. Please try again.',
           sender: 'ai',
         },
       ])
     } finally {
+      // Stop loading
       setLoading(false)
     }
   }
