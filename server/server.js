@@ -2,14 +2,14 @@ require('dotenv').config()
 
 const express = require('express')
 const cors = require('cors')
-const { GoogleGenAI } = require('@google/genai')
+const Groq = require('groq-sdk')
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// Create Gemini AI client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+// Create Groq AI client
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 })
 
 // Middleware
@@ -30,18 +30,21 @@ app.post('/api/chat', async (req, res) => {
 
     console.log('User asked:', userMessage)
 
-    // Check if message is empty
+    // Check for empty message
     if (!userMessage || userMessage.trim() === '') {
       return res.status(400).json({
         reply: 'Please enter a question.',
       })
     }
 
-    // Send question to Gemini
-    const interaction = await ai.interactions.create({
-      model: 'gemini-3.8-flash',
+    // Send request to Groq
+    const completion = await groq.chat.completions.create({
+      model: 'openai/gpt-oss-20b',
 
-      system_instruction: `
+      messages: [
+        {
+          role: 'system',
+          content: `
 You are AstraAI, a friendly educational AI assistant.
 
 Your job is to explain answers clearly and accurately, especially for students.
@@ -98,17 +101,24 @@ IMPORTANT RESPONSE RULES:
 17. End every educational answer with:
 
 ### In one line
+
 Give a very short summary of the answer.
 
 IMPORTANT:
 Do not write everything as a single paragraph.
 Make the answer neat, structured, and easy to study.
-`,
-
-      input: userMessage,
+          `,
+        },
+        {
+          role: 'user',
+          content: userMessage,
+        },
+      ],
     })
 
-    const answer = interaction.output_text
+    const answer =
+      completion.choices[0]?.message?.content ||
+      'Sorry, I could not generate a response.'
 
     console.log('AstraAI replied successfully.')
 
@@ -117,20 +127,21 @@ Make the answer neat, structured, and easy to study.
     })
 
   } catch (error) {
-    console.error('Gemini Error:')
+    console.error('Groq Error:')
     console.error(error)
 
-    // Handle Gemini rate limit
-    if (error.statusCode === 429 || error.status === 429) {
+    // Handle rate limit
+    if (error.status === 429) {
       return res.status(429).json({
         reply:
-          'AstraAI is temporarily busy because the Gemini Free Tier limit has been reached. Please try again later.',
+          'AstraAI is temporarily busy because the AI request limit has been reached. Please try again later.',
       })
     }
 
     // Handle other errors
     res.status(500).json({
-      reply: 'Sorry, AstraAI could not generate a response.',
+      reply:
+        'Sorry, AstraAI could not generate a response.',
     })
   }
 })
