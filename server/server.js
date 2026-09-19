@@ -5,7 +5,7 @@ const cors = require('cors')
 const { GoogleGenAI } = require('@google/genai')
 
 const app = express()
-const PORT = 5000
+const PORT = process.env.PORT || 5000
 
 // Create Gemini AI client
 const ai = new GoogleGenAI({
@@ -30,12 +30,14 @@ app.post('/api/chat', async (req, res) => {
 
     console.log('User asked:', userMessage)
 
+    // Check if message is empty
     if (!userMessage || userMessage.trim() === '') {
       return res.status(400).json({
         reply: 'Please enter a question.',
       })
     }
 
+    // Send question to Gemini
     const interaction = await ai.interactions.create({
       model: 'gemini-3.8-flash',
 
@@ -118,6 +120,15 @@ Make the answer neat, structured, and easy to study.
     console.error('Gemini Error:')
     console.error(error)
 
+    // Handle Gemini rate limit
+    if (error.statusCode === 429 || error.status === 429) {
+      return res.status(429).json({
+        reply:
+          'AstraAI is temporarily busy because the Gemini Free Tier limit has been reached. Please try again later.',
+      })
+    }
+
+    // Handle other errors
     res.status(500).json({
       reply: 'Sorry, AstraAI could not generate a response.',
     })
@@ -126,5 +137,7 @@ Make the answer neat, structured, and easy to study.
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`AstraAI server is running on http://localhost:${PORT}`)
+  console.log(
+    `AstraAI server is running on port ${PORT}`
+  )
 })
